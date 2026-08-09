@@ -1,0 +1,8 @@
+[package]
+name = "palkki_config"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+palkki = { path = "palkki_lib"}
+time = { version = "0.3.55", features = ["local-offset"] }
