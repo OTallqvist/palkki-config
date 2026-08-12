@@ -16,6 +16,7 @@ fn main() {
 }
 
 pub(crate) trait LogErr: Sized {
+    #[track_caller]
     fn log(self) -> Self;
 }
 

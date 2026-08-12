@@ -4,7 +4,7 @@ use std::{
 };
 
 use palkki::{
-    Damage,
+    Rect,
     widget::{Pixel, Positioning, TextPosition, Widget},
 };
 
@@ -65,6 +65,6 @@ impl Widget for Cpu {
         block.set_bg_color(Pixel::rgb(0x2A, 0x2A, 0x2A));
         let usage = format!("{usage}%");
         let _ = block.draw_text(&usage, 12., TextPosition::Center, Pixel::WHITE);
-        block.damage = Damage::from_0_0(block.block.size)
+        block.damage = Rect::from_0_0(block.block.size)
     }
 }

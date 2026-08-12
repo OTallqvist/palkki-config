@@ -1,4 +1,4 @@
-use palkki::Damage;
+use palkki::Rect;
 use palkki::Vec2;
 use palkki::widget::DrawableBlock;
 use palkki::widget::Pixel;
@@ -86,6 +86,6 @@ impl Widget for Ram {
         block.set_bg_color(Pixel::rgb(0x3A, 0x3A, 0x3A));
         let usage = ram_usage_to_str(usage);
         let _ = block.draw_text(&usage, 12., TextPosition::Center, Pixel::WHITE);
-        block.damage = Damage::from_0_0(block.block.size)
+        block.damage = Rect::from_0_0(block.block.size)
     }
 }

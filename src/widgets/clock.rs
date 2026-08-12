@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use palkki::{
-    Damage, Vec2,
+    Rect, Vec2,
     widget::{DrawableBlock, Pixel, Positioning, TextPosition, Widget},
 };
 
@@ -34,7 +34,7 @@ impl Widget for Clock {
         //for some reason the string contains a ".0" at the end
         time_str.truncate(time_str.len() - 2);
         let _ = block.draw_text(&time_str, 12., TextPosition::Center, Pixel::WHITE);
-        block.damage = Damage::from_0_0(block.block.size)
+        block.damage = Rect::from_0_0(block.block.size)
     }
     fn update_time(&self) -> std::time::Duration {
         Duration::from_millis(200)

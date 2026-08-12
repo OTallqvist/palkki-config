@@ -6,8 +6,9 @@ use std::{
     str::FromStr,
 };
 
+use dbg_if::dbg_if_hash_ne;
 use palkki::{
-    Damage,
+    Rect,
     widget::{Pixel, Positioning, TextPosition, Widget},
 };
 
@@ -97,6 +98,7 @@ impl Battery {
         }
     }
 
+    //returns power in deciWatts
     fn get_power(&mut self) -> Option<u32> {
         let mut power_now = String::new();
         self.power_now_file
@@ -105,7 +107,7 @@ impl Battery {
             .ok()?;
         let _ = self.power_now_file.rewind();
         power_now.truncate(power_now.len() - 1);
-        let power_now = power_now.parse::<u32>().log().ok()?;
+        let power_now = power_now.parse::<u32>().log().ok()? / 100_000;
         if power_now == self.prev_power {
             None
         } else {
@@ -120,6 +122,7 @@ impl Widget for Battery {
         let permillage = self.get_battery_permillage();
         let status = self.get_battery_status();
         let power = self.get_power();
+        dbg_if_hash_ne!(&power);
         if permillage.is_none() && status.is_none() && power.is_none() {
             return;
         }
@@ -136,17 +139,17 @@ impl Widget for Battery {
             format!(
                 "b:{:.1}% {:.1}W",
                 u16::from(permillage) as f32 / 10.,
-                power as f32 / 1_000_000.
+                power as f32 / 10.
             )
         } else {
             format!(
                 "b:{:.0}% {:.1}W",
                 u16::from(permillage) as f32 / 10.,
-                power as f32 / 1_000_000.
+                power as f32 / 10.
             )
         };
         let _ = block.draw_text(&display_text, 12., TextPosition::Center, text_color);
-        block.damage = Damage::from_0_0(block.block.size)
+        block.damage = Rect::from_0_0(block.block.size)
     }
     fn postioning(&self, _: palkki::Vec2) -> palkki::widget::Positioning {
         Positioning::RightAlign { width: 120 }
