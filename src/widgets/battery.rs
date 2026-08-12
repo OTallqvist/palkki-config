@@ -1,3 +1,4 @@
+use crate::LogErr;
 use std::{
     fs::File,
     io::{Read, Seek},
@@ -65,11 +66,14 @@ impl Battery {
 
     fn get_battery_permillage(&mut self) -> Option<NonZero<u16>> {
         let mut energy_now = String::new();
-        self.energy_now_file.read_to_string(&mut energy_now).ok()?;
+        self.energy_now_file
+            .read_to_string(&mut energy_now)
+            .log()
+            .ok()?;
         let _ = self.energy_now_file.rewind();
         //remove newline from end
         energy_now.truncate(energy_now.len() - 1);
-        let energy_now = energy_now.parse::<f32>().unwrap();
+        let energy_now = energy_now.parse::<f32>().log().ok()?;
         let permillage = (energy_now / self.energy_full * 1000.) as u16;
         if permillage == self.prev_battery_permillage {
             None
@@ -81,10 +85,10 @@ impl Battery {
 
     fn get_battery_status(&mut self) -> Option<BatteryStatus> {
         let mut status = String::new();
-        self.status_file.read_to_string(&mut status).unwrap();
+        self.status_file.read_to_string(&mut status).log().ok()?;
         let _ = self.status_file.rewind();
         let status = status.trim();
-        let status = status.parse().ok()?;
+        let status = status.parse().log().ok()?;
         if status == self.prev_status {
             None
         } else {
@@ -95,10 +99,13 @@ impl Battery {
 
     fn get_power(&mut self) -> Option<u32> {
         let mut power_now = String::new();
-        self.power_now_file.read_to_string(&mut power_now).unwrap();
+        self.power_now_file
+            .read_to_string(&mut power_now)
+            .log()
+            .ok()?;
         let _ = self.power_now_file.rewind();
         power_now.truncate(power_now.len() - 1);
-        let power_now = power_now.parse::<u32>().unwrap();
+        let power_now = power_now.parse::<u32>().log().ok()?;
         if power_now == self.prev_power {
             None
         } else {
@@ -125,12 +132,20 @@ impl Widget for Battery {
             BatteryStatus::Charging => Pixel::rgb(100, 255, 100),
         };
         block.set_bg_color(Pixel::rgb(0x3A, 0x3A, 0x3A));
-        let percentage = format!(
-            "b:{:.1}% {:.1}W",
-            u16::from(permillage) as f32 / 10.,
-            power as f32 / 1_000_000.
-        );
-        let _ = block.draw_text(&percentage, 12., TextPosition::Center, text_color);
+        let display_text = if u16::from(permillage) < 1000 {
+            format!(
+                "b:{:.1}% {:.1}W",
+                u16::from(permillage) as f32 / 10.,
+                power as f32 / 1_000_000.
+            )
+        } else {
+            format!(
+                "b:{:.0}% {:.1}W",
+                u16::from(permillage) as f32 / 10.,
+                power as f32 / 1_000_000.
+            )
+        };
+        let _ = block.draw_text(&display_text, 12., TextPosition::Center, text_color);
         block.damage = Damage::from_0_0(block.block.size)
     }
     fn postioning(&self, _: palkki::Vec2) -> palkki::widget::Positioning {

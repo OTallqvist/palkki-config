@@ -1,5 +1,7 @@
 mod widgets;
 const BAR_HEIGHT: u32 = 20;
+use std::fmt::Debug;
+
 use palkki::Bar;
 fn main() {
     let mut bar = Bar::new(BAR_HEIGHT);
@@ -11,4 +13,16 @@ fn main() {
         &widgets::Battery::new_dyn,
     ]);
     bar.run();
+}
+
+pub(crate) trait LogErr: Sized {
+    fn log(self) -> Self;
+}
+
+impl<T, E: Debug> LogErr for Result<T, E> {
+    fn log(self) -> Self {
+        self.inspect_err(|e| {
+            dbg!(e);
+        })
+    }
 }
