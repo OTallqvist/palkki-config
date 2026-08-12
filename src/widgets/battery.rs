@@ -6,8 +6,8 @@ use std::{
 };
 
 use palkki::{
-    Damage, Vec2,
-    widget::{DrawableBlock, Pixel, Positioning, TextPosition, Widget},
+    Damage,
+    widget::{Pixel, Positioning, TextPosition, Widget},
 };
 
 const BATTERY_PATH: &str = "/sys/class/power_supply/BAT0";
@@ -35,9 +35,11 @@ pub struct Battery {
     ///Battery percentage in tenths of a percent
     prev_battery_permillage: u16,
     prev_status: BatteryStatus,
+    prev_power: u32,
     energy_full: f32,
     energy_now_file: File,
     status_file: File,
+    power_now_file: File,
 }
 
 impl Battery {
@@ -53,11 +55,14 @@ impl Battery {
         Box::new(Self {
             prev_battery_permillage: u16::MAX, //gets updated
             energy_full,
+            prev_power: 0,
             energy_now_file: File::open(format!("{BATTERY_PATH}/energy_now")).unwrap(),
             status_file: File::open(format!("{BATTERY_PATH}/status")).unwrap(),
+            power_now_file: File::open(format!("{BATTERY_PATH}/power_now")).unwrap(),
             prev_status: BatteryStatus::Full,
         })
     }
+
     fn get_battery_permillage(&mut self) -> Option<NonZero<u16>> {
         let mut energy_now = String::new();
         self.energy_now_file.read_to_string(&mut energy_now).ok()?;
@@ -73,6 +78,7 @@ impl Battery {
             NonZero::new(permillage)
         }
     }
+
     fn get_battery_status(&mut self) -> Option<BatteryStatus> {
         let mut status = String::new();
         self.status_file.read_to_string(&mut status).unwrap();
@@ -86,79 +92,48 @@ impl Battery {
             Some(status)
         }
     }
-    //TODO:
-    fn draw_battery_icon(&mut self, block: &mut DrawableBlock, color: Pixel, width: u32) {
-        const ICON_HEIGHT: u32 = 8;
-        let offset = Vec2 {
-            x: 1,
-            y: (block.height() - ICON_HEIGHT) / 2,
-        };
-        draw_battery_icon_ends(block, offset, width, ICON_HEIGHT, color);
-        let lines = offset.y..offset.y + ICON_HEIGHT;
-        for y in lines.clone() {
-            let line_len = width as usize;
-            let line = block
-                .mutate_line(Vec2 { x: offset.x, y }, line_len)
-                .unwrap();
-            line.iter_mut()
-                .enumerate()
-                .filter(|(x, _)| *x == 0 || *x == line_len - 1)
-                .for_each(|(_, px)| *px = color);
-        }
-        block
-            .set_pixel(Vec2::new(width, ICON_HEIGHT / 2 - 1) + offset, color)
-            .unwrap();
-        block
-            .set_pixel(Vec2::new(width, ICON_HEIGHT / 2) + offset, color)
-            .unwrap();
-        block
-            .set_pixel(Vec2::new(width, ICON_HEIGHT / 2 + 1) + offset, color)
-            .unwrap();
-    }
-}
 
-fn draw_battery_icon_ends(
-    block: &mut DrawableBlock,
-    offset: Vec2,
-    width: u32,
-    height: u32,
-    color: Pixel,
-) {
-    //top
-    block
-        .mutate_line(offset, width as usize)
-        .unwrap()
-        .iter_mut()
-        .for_each(|px| *px = color);
-    //bottom
-    block
-        .mutate_line(offset + Vec2::from_y(height), width as usize)
-        .unwrap()
-        .iter_mut()
-        .for_each(|px| *px = color);
+    fn get_power(&mut self) -> Option<u32> {
+        let mut power_now = String::new();
+        self.power_now_file.read_to_string(&mut power_now).unwrap();
+        let _ = self.power_now_file.rewind();
+        power_now.truncate(power_now.len() - 1);
+        let power_now = power_now.parse::<u32>().unwrap();
+        if power_now == self.prev_power {
+            None
+        } else {
+            self.prev_power = power_now;
+            Some(power_now)
+        }
+    }
 }
 
 impl Widget for Battery {
     fn redraw(&mut self, block: &mut palkki::widget::DrawableBlock) {
         let permillage = self.get_battery_permillage();
         let status = self.get_battery_status();
-        if permillage.is_none() && status.is_none() {
+        let power = self.get_power();
+        if permillage.is_none() && status.is_none() && power.is_none() {
             return;
         }
         let permillage = permillage.unwrap_or(NonZero::new(self.prev_battery_permillage).unwrap());
         let status = status.unwrap_or(self.prev_status);
+        let power = power.unwrap_or(self.prev_power);
         let text_color = match status {
             BatteryStatus::Full => Pixel::rgb(255, 255, 255),
             BatteryStatus::Discharging => Pixel::rgb(255, 100, 100),
             BatteryStatus::Charging => Pixel::rgb(100, 255, 100),
         };
         block.set_bg_color(Pixel::rgb(0x3A, 0x3A, 0x3A));
-        // self.draw_battery_icon(block, text_color, 17);
-        let percentage = format!("b:{:.1}%", u16::from(permillage) as f32 / 10.);
+        let percentage = format!(
+            "b:{:.1}% {:.1}W",
+            u16::from(permillage) as f32 / 10.,
+            power as f32 / 1_000_000.
+        );
         let _ = block.draw_text(&percentage, 12., TextPosition::Center, text_color);
         block.damage = Damage::from_0_0(block.block.size)
     }
     fn postioning(&self, _: palkki::Vec2) -> palkki::widget::Positioning {
-        Positioning::RightAlign { width: 70 }
+        Positioning::RightAlign { width: 120 }
     }
 }
