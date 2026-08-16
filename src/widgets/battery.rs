@@ -122,7 +122,6 @@ impl Widget for Battery {
         let permillage = self.get_battery_permillage();
         let status = self.get_battery_status();
         let power = self.get_power();
-        dbg_if_hash_ne!(&power);
         if permillage.is_none() && status.is_none() && power.is_none() {
             return;
         }
@@ -148,7 +147,9 @@ impl Widget for Battery {
                 power as f32 / 10.
             )
         };
-        let _ = block.draw_text(&display_text, 12., TextPosition::Center, text_color);
+        block
+            .draw_text(&display_text, 12., TextPosition::Center, text_color)
+            .unwrap();
         block.damage = Rect::from_0_0(block.block.size)
     }
     fn postioning(&self, _: palkki::Vec2) -> palkki::widget::Positioning {

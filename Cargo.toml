@@ -3,7 +3,10 @@ name = "palkki_config"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+members = ["crates/*"]
+
 [dependencies]
-palkki = { path = "palkki_lib"}
+palkki = { path = "crates/palkki_lib"}
 dbg_if = { git = "https://github.com/OTallqvist/dbg_if.git"}
 time = { version = "0.3.55", features = ["local-offset"] }
