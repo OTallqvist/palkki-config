@@ -21,6 +21,7 @@ pub(crate) trait LogErr: Sized {
 }
 
 impl<T, E: Debug> LogErr for Result<T, E> {
+    #[track_caller]
     fn log(self) -> Self {
         self.inspect_err(|e| {
             dbg!(e);
