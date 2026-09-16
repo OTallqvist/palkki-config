@@ -65,7 +65,7 @@ impl Battery {
         })
     }
 
-    fn get_battery_permillage(&mut self) -> Option<NonZero<u16>> {
+    fn get_battery_charge(&mut self) -> Option<NonZero<u16>> {
         let mut energy_now = String::new();
         self.energy_now_file
             .read_to_string(&mut energy_now)
@@ -75,12 +75,12 @@ impl Battery {
         //remove newline from end
         energy_now.truncate(energy_now.len() - 1);
         let energy_now = energy_now.parse::<f32>().log().ok()?;
-        let permillage = (energy_now / self.energy_full * 1000.) as u16;
-        if permillage == self.prev_battery_permillage {
+        let charge = (energy_now / self.energy_full * 10000.) as u16;
+        if charge == self.prev_battery_permillage {
             None
         } else {
-            self.prev_battery_permillage = permillage;
-            NonZero::new(permillage)
+            self.prev_battery_permillage = charge;
+            NonZero::new(charge)
         }
     }
 
@@ -119,13 +119,13 @@ impl Battery {
 
 impl Widget for Battery {
     fn redraw(&mut self, block: &mut palkki::widget::DrawableBlock) {
-        let permillage = self.get_battery_permillage();
+        let permillage = self.get_battery_charge();
         let status = self.get_battery_status();
         let power = self.get_power();
         if permillage.is_none() && status.is_none() && power.is_none() {
             return;
         }
-        let permillage = permillage.unwrap_or(NonZero::new(self.prev_battery_permillage).unwrap());
+        let charge = permillage.unwrap_or(NonZero::new(self.prev_battery_permillage).unwrap());
         let status = status.unwrap_or(self.prev_status);
         let power = power.unwrap_or(self.prev_power);
         let text_color = match status {
@@ -134,16 +134,16 @@ impl Widget for Battery {
             BatteryStatus::Charging => Pixel::rgb(100, 255, 100),
         };
         block.set_bg_color(Pixel::rgb(0x3A, 0x3A, 0x3A));
-        let display_text = if u16::from(permillage) < 1000 {
+        let display_text = if u16::from(charge) < 10000 {
             format!(
-                "b:{:.1}% {:.1}W",
-                u16::from(permillage) as f32 / 10.,
+                "b:{:.2}% {:.1}W",
+                u16::from(charge) as f32 / 100.,
                 power as f32 / 10.
             )
         } else {
             format!(
                 "b:{:.0}% {:.1}W",
-                u16::from(permillage) as f32 / 10.,
+                u16::from(charge) as f32 / 100.,
                 power as f32 / 10.
             )
         };
@@ -153,6 +153,6 @@ impl Widget for Battery {
         block.damage = Rect::from_0_0(block.block.size)
     }
     fn postioning(&self, _: palkki::Vec2) -> palkki::widget::Positioning {
-        Positioning::RightAlign { width: 120 }
+        Positioning::RightAlign { width: 150 }
     }
 }
