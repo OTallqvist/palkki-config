@@ -1,10 +1,10 @@
 mod widgets;
-const BAR_HEIGHT: u32 = 20;
+const BAR_HEIGHT: u32 = 19;
 use std::fmt::Debug;
 
 use palkki::Bar;
 fn main() {
-    let mut bar = Bar::new(BAR_HEIGHT);
+    let mut bar = Bar::with_height(BAR_HEIGHT);
     //TODO:  bar.add_bg(Bg::new)
     bar.add_widgets(&[
         &widgets::Clock::new_dyn,
