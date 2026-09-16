@@ -19,18 +19,35 @@ impl Clock {
         })
     }
 }
+const BG_COLOR: Pixel = Pixel::rgb(0x3A, 0x3A, 0x3A);
 
 impl Widget for Clock {
     fn postioning(&self, _: Vec2) -> Positioning {
-        Positioning::LeftAlign { width: 150 }
+        Positioning::LeftAlign { width: 120 }
     }
     fn redraw(&mut self, block: &mut DrawableBlock) {
         let now = time::OffsetDateTime::now_local().unwrap_or(time::OffsetDateTime::now_utc());
         let date = now.date();
-        block.set_bg_color(Pixel::rgb(0x3A, 0x3A, 0x3A));
+        const TIME_DATE_SPLIT: u32 = 70;
+        log!(block.set_bg_color_region(
+            Rect::from_0_0(Vec2::new(TIME_DATE_SPLIT, block.height())),
+            BG_COLOR
+        ));
         if date != self.last_date {
-            let date_str = format!("{}-{}", date.day(), date.month());
-            log!(block.draw_text("test", 12., TextPosition::Right { y: 2 }, Pixel::WHITE));
+            log!(block.set_bg_color_region(
+                Rect::new(
+                    Vec2::from_x(TIME_DATE_SPLIT),
+                    Vec2::new(block.width() - TIME_DATE_SPLIT, block.height())
+                ),
+                BG_COLOR
+            ));
+            let date_str = format!("{}-{}", date.day(), date.month() as u8);
+            log!(block.draw_text(
+                &date_str,
+                12.,
+                TextPosition::Right { y: 2, padd: 5 },
+                Pixel::WHITE
+            ));
             self.last_date = date;
         }
         let mut time_str = now.time().truncate_to_second().to_string();
@@ -39,7 +56,7 @@ impl Widget for Clock {
         log!(block.draw_text(
             &time_str,
             12.,
-            TextPosition::Absolute(Vec2 { x: 1, y: 2 }),
+            TextPosition::Left { padd: 3, y: 2 },
             Pixel::WHITE,
         ));
         block.damage = Rect::from_0_0(block.block.size)
