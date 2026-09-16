@@ -1,6 +1,5 @@
 mod widgets;
 const BAR_HEIGHT: u32 = 19;
-use std::fmt::Debug;
 
 use palkki::Bar;
 fn main() {
@@ -15,16 +14,34 @@ fn main() {
     bar.run();
 }
 
-pub(crate) trait LogErr: Sized {
-    #[track_caller]
-    fn log(self) -> Self;
+#[macro_export]
+macro_rules! log_pass {
+    ($val:expr) => {
+        Result::inspect_err($val, |e| {
+            std::eprintln!(
+                "[{}:{}:{}] {} = {:#?}",
+                std::file!(),
+                std::line!(),
+                std::column!(),
+                std::stringify!($val),
+                &&e as &dyn std::fmt::Debug,
+            );
+        })
+    };
 }
 
-impl<T, E: Debug> LogErr for Result<T, E> {
-    #[track_caller]
-    fn log(self) -> Self {
-        self.inspect_err(|e| {
-            dbg!(e);
-        })
-    }
+#[macro_export]
+macro_rules! log {
+    ($val:expr) => {
+        let _ = Result::inspect_err({ $val }, |e| {
+            std::eprintln!(
+                "[{}:{}:{}] {} = {:#?}",
+                std::file!(),
+                std::line!(),
+                std::column!(),
+                std::stringify!($val),
+                &&e as &dyn std::fmt::Debug,
+            );
+        });
+    };
 }

@@ -1,4 +1,3 @@
-use crate::LogErr;
 use std::{
     fs::File,
     io::{Read, Seek},
@@ -6,11 +5,12 @@ use std::{
     str::FromStr,
 };
 
-use dbg_if::dbg_if_hash_ne;
 use palkki::{
     Rect,
     widget::{Pixel, Positioning, TextPosition, Widget},
 };
+
+use crate::log_pass;
 
 const BATTERY_PATH: &str = "/sys/class/power_supply/BAT0";
 
@@ -67,14 +67,11 @@ impl Battery {
 
     fn get_battery_charge(&mut self) -> Option<NonZero<u16>> {
         let mut energy_now = String::new();
-        self.energy_now_file
-            .read_to_string(&mut energy_now)
-            .log()
-            .ok()?;
+        log_pass!(self.energy_now_file.read_to_string(&mut energy_now)).ok()?;
         let _ = self.energy_now_file.rewind();
         //remove newline from end
         energy_now.truncate(energy_now.len() - 1);
-        let energy_now = energy_now.parse::<f32>().log().ok()?;
+        let energy_now = log_pass!(energy_now.parse::<f32>()).ok()?;
         let charge = (energy_now / self.energy_full * 10000.) as u16;
         if charge == self.prev_battery_permillage {
             None
@@ -86,10 +83,10 @@ impl Battery {
 
     fn get_battery_status(&mut self) -> Option<BatteryStatus> {
         let mut status = String::new();
-        self.status_file.read_to_string(&mut status).log().ok()?;
+        log_pass!(self.status_file.read_to_string(&mut status)).ok()?;
         let _ = self.status_file.rewind();
         let status = status.trim();
-        let status = status.parse().log().ok()?;
+        let status = log_pass!(status.parse()).ok()?;
         if status == self.prev_status {
             None
         } else {
@@ -101,13 +98,10 @@ impl Battery {
     //returns power in deciWatts
     fn get_power(&mut self) -> Option<u32> {
         let mut power_now = String::new();
-        self.power_now_file
-            .read_to_string(&mut power_now)
-            .log()
-            .ok()?;
+        log_pass!(self.power_now_file.read_to_string(&mut power_now)).ok()?;
         let _ = self.power_now_file.rewind();
         power_now.truncate(power_now.len() - 1);
-        let power_now = power_now.parse::<u32>().log().ok()? / 100_000;
+        let power_now = log_pass!(power_now.parse::<u32>()).ok()? / 100_000;
         if power_now == self.prev_power {
             None
         } else {
