@@ -1,3 +1,4 @@
+use anyhow::Context;
 use palkki::Rect;
 use palkki::Vec2;
 use palkki::widget::DrawableBlock;
@@ -22,7 +23,7 @@ fn get_total_ram(meminfo: &mut File) -> usize {
     meminfo.rewind().unwrap();
     let buf = str::from_utf8(buf.as_ref()).unwrap();
     let mut lines = buf.lines();
-    parse_meminfo_line(lines.next().unwrap())
+    parse_meminfo_line(lines.next().unwrap()).unwrap()
 }
 
 impl Ram {
@@ -38,25 +39,29 @@ impl Ram {
     ///Ram usage in GB
     ///Returns None if the value didn't change since last update. And therefor the widget does not
     ///need to update anything
-    fn get_ram_usage(&mut self) -> Option<f32> {
+    fn get_ram_usage(&mut self) -> anyhow::Result<Option<f32>> {
         let mut buf = [0; 150];
-        self.meminfo.read_exact(&mut buf).unwrap();
-        self.meminfo.rewind().unwrap();
-        let buf = str::from_utf8(buf.as_ref()).unwrap();
+        self.meminfo.read_exact(&mut buf).context("meminfo read")?;
+        self.meminfo.rewind().context("meminfo read")?;
+        let buf = str::from_utf8(buf.as_ref()).context("meminfo read")?;
         let mut lines = buf.lines().skip(2);
-        let avail_ram = parse_meminfo_line(lines.next().unwrap());
+        let avail_ram = parse_meminfo_line(
+            lines
+                .next()
+                .context("didn't get the 3rd line of /proc/meminfo")?,
+        )?;
         let usage = (self.total_ram - avail_ram) * 1000 / 1_048_576 / 8; //conversion to 8MiB
         //The conversion is done like this because ram usage is displayed with precision of 10MiB so
-        //any smaller change won't matter. 8MiB is used specifically because the math is easier
+        //any smaller change won't matter
         if self.last_ram_usage == usage {
-            None
+            Ok(None)
         } else {
-            Some(usage as f32 / 128.) //conversion to GiB
+            Ok(Some(usage as f32 / 128.)) //conversion to GiB
         }
     }
 }
 
-fn parse_meminfo_line(line: &str) -> usize {
+fn parse_meminfo_line(line: &str) -> anyhow::Result<usize> {
     let mut number: String = line
         .chars()
         .skip_while(|c| *c != ' ')
@@ -64,7 +69,9 @@ fn parse_meminfo_line(line: &str) -> usize {
         .collect();
     //number = "{actual_number} kB"
     number.truncate(number.len() - 3);
-    number.parse::<usize>().unwrap()
+    number
+        .parse::<usize>()
+        .context(format!("meminfo number to parse: {number}"))
 }
 
 fn ram_usage_to_str(usage: f32) -> String {
@@ -73,19 +80,23 @@ fn ram_usage_to_str(usage: f32) -> String {
 }
 
 impl Widget for Ram {
+    fn name(&self) -> &'static str {
+        "Ram"
+    }
     fn update_time(&self) -> std::time::Duration {
         Duration::from_millis(2000)
     }
     fn postioning(&self, _: Vec2) -> Positioning {
         Positioning::RightAlign { width: 70 }
     }
-    fn redraw(&mut self, block: &mut DrawableBlock) {
-        let Some(usage) = self.get_ram_usage() else {
-            return;
+    fn redraw(&mut self, block: &mut DrawableBlock) -> anyhow::Result<()> {
+        let Some(usage) = self.get_ram_usage()? else {
+            return Ok(());
         };
         block.set_bg_color(Pixel::rgb(0x3A, 0x3A, 0x3A));
         let usage = ram_usage_to_str(usage);
         let _ = block.draw_text(&usage, 12., TextPosition::Center, Pixel::WHITE);
-        block.damage = Rect::from_0_0(block.block.size)
+        block.damage = Rect::from_0_0(block.block.size);
+        Ok(())
     }
 }

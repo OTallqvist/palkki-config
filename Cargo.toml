@@ -10,3 +10,4 @@ members = ["crates/*"]
 palkki = { path = "crates/palkki_lib"}
 dbg_if = { git = "https://github.com/OTallqvist/dbg_if.git"}
 time = { version = "0.3.55", features = ["local-offset"] }
+anyhow = "1.0.104"

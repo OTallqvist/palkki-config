@@ -1,16 +1,16 @@
 use std::{
+    fmt,
     fs::File,
     io::{Read, Seek},
     num::NonZero,
     str::FromStr,
 };
 
+use anyhow::Context;
 use palkki::{
     Rect,
     widget::{Pixel, Positioning, TextPosition, Widget},
 };
-
-use crate::log_pass;
 
 const BATTERY_PATH: &str = "/sys/class/power_supply/BAT0";
 
@@ -21,16 +21,27 @@ enum BatteryStatus {
     Charging,
 }
 
+#[derive(Debug)]
+struct StatusParseError;
+
+impl fmt::Display for StatusParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "StatusParseError")
+    }
+}
+
+impl std::error::Error for StatusParseError {}
+
 impl FromStr for BatteryStatus {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Discharging" => Ok(BatteryStatus::Discharging),
             "Charging" => Ok(BatteryStatus::Charging),
             "Not charging" => Ok(BatteryStatus::Full),
-            _ => Err(()),
+            _ => Err(StatusParseError),
         }
     }
-    type Err = ();
+    type Err = StatusParseError;
 }
 
 pub struct Battery {
@@ -65,59 +76,80 @@ impl Battery {
         })
     }
 
-    fn get_battery_charge(&mut self) -> Option<NonZero<u16>> {
+    fn get_battery_charge(&mut self) -> anyhow::Result<Option<NonZero<u16>>> {
         let mut energy_now = String::new();
-        log_pass!(self.energy_now_file.read_to_string(&mut energy_now)).ok()?;
-        let _ = self.energy_now_file.rewind();
+        if self
+            .energy_now_file
+            .read_to_string(&mut energy_now)
+            .is_err()
+        {
+            return Ok(None);
+        }
+        self.energy_now_file.rewind().context("energy_now rewind")?;
         //remove newline from end
         energy_now.truncate(energy_now.len() - 1);
-        let energy_now = log_pass!(energy_now.parse::<f32>()).ok()?;
+        let energy_now = energy_now
+            .parse::<f32>()
+            .context(format!("energy_now parse: energy_now = {energy_now}"))?;
         let charge = (energy_now / self.energy_full * 10000.) as u16;
         if charge == self.prev_battery_permillage {
-            None
+            Ok(None)
         } else {
             self.prev_battery_permillage = charge;
-            NonZero::new(charge)
+            Ok(NonZero::new(charge))
         }
     }
 
-    fn get_battery_status(&mut self) -> Option<BatteryStatus> {
+    fn get_battery_status(&mut self) -> anyhow::Result<Option<BatteryStatus>> {
         let mut status = String::new();
-        log_pass!(self.status_file.read_to_string(&mut status)).ok()?;
-        let _ = self.status_file.rewind();
+        if self.status_file.read_to_string(&mut status).is_err() {
+            return Ok(None);
+        }
+        self.status_file.rewind().context("status_file rewind")?;
         let status = status.trim();
-        let status = log_pass!(status.parse()).ok()?;
+        let status = status
+            .parse()
+            .context(format!("bat status parse: status = {status}"))?;
         if status == self.prev_status {
-            None
+            Ok(None)
         } else {
             self.prev_status = status;
-            Some(status)
+            Ok(Some(status))
         }
     }
 
     //returns power in deciWatts
-    fn get_power(&mut self) -> Option<u32> {
+    fn get_power(&mut self) -> anyhow::Result<Option<u32>> {
         let mut power_now = String::new();
-        log_pass!(self.power_now_file.read_to_string(&mut power_now)).ok()?;
-        let _ = self.power_now_file.rewind();
+        if self.power_now_file.read_to_string(&mut power_now).is_err() {
+            return Ok(None);
+        }
+        self.power_now_file.rewind().context("power_now rewind")?;
         power_now.truncate(power_now.len() - 1);
-        let power_now = log_pass!(power_now.parse::<u32>()).ok()? / 100_000;
+        let power_now = "semi tavi";
+        let power_now = power_now
+            .parse::<u32>()
+            .context(format!("power_now parse: power_now = {power_now}"))?
+            / 100_000;
         if power_now == self.prev_power {
-            None
+            Ok(None)
         } else {
             self.prev_power = power_now;
-            Some(power_now)
+            Ok(Some(power_now))
         }
     }
 }
 
 impl Widget for Battery {
-    fn redraw(&mut self, block: &mut palkki::widget::DrawableBlock) {
-        let permillage = self.get_battery_charge();
-        let status = self.get_battery_status();
-        let power = self.get_power();
+    fn name(&self) -> &'static str {
+        "Battery"
+    }
+    fn redraw(&mut self, block: &mut palkki::widget::DrawableBlock) -> Result<(), anyhow::Error> {
+        let permillage = self.get_battery_charge()?;
+        let status = self.get_battery_status()?;
+        let power = self.get_power()?;
         if permillage.is_none() && status.is_none() && power.is_none() {
-            return;
+            return Ok(());
         }
         let charge = permillage.unwrap_or(NonZero::new(self.prev_battery_permillage).unwrap());
         let status = status.unwrap_or(self.prev_status);
@@ -130,13 +162,13 @@ impl Widget for Battery {
         block.set_bg_color(Pixel::rgb(0x3A, 0x3A, 0x3A));
         let display_text = if u16::from(charge) < 10000 {
             format!(
-                "b:{:.2}% {:.1}W",
+                "{:.2}% {:.1}W",
                 u16::from(charge) as f32 / 100.,
                 power as f32 / 10.
             )
         } else {
             format!(
-                "b:{:.0}% {:.1}W",
+                "{:.0}% {:.1}W",
                 u16::from(charge) as f32 / 100.,
                 power as f32 / 10.
             )
@@ -144,7 +176,8 @@ impl Widget for Battery {
         block
             .draw_text(&display_text, 12., TextPosition::Center, text_color)
             .unwrap();
-        block.damage = Rect::from_0_0(block.block.size)
+        block.damage = Rect::from_0_0(block.block.size);
+        Ok(())
     }
     fn postioning(&self, _: palkki::Vec2) -> palkki::widget::Positioning {
         Positioning::RightAlign { width: 150 }
