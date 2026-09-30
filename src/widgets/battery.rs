@@ -90,7 +90,7 @@ impl Battery {
         energy_now.truncate(energy_now.len() - 1);
         let energy_now = energy_now
             .parse::<f32>()
-            .context(format!("energy_now parse: energy_now = {energy_now}"))?;
+            .context(format!("energy_now parse: energy_now = \"{energy_now}\""))?;
         let charge = (energy_now / self.energy_full * 10000.) as u16;
         if charge == self.prev_battery_permillage {
             Ok(None)
@@ -109,7 +109,7 @@ impl Battery {
         let status = status.trim();
         let status = status
             .parse()
-            .context(format!("bat status parse: status = {status}"))?;
+            .context(format!("bat status parse: status = \"{status}\""))?;
         if status == self.prev_status {
             Ok(None)
         } else {
@@ -126,10 +126,9 @@ impl Battery {
         }
         self.power_now_file.rewind().context("power_now rewind")?;
         power_now.truncate(power_now.len() - 1);
-        let power_now = "semi tavi";
         let power_now = power_now
             .parse::<u32>()
-            .context(format!("power_now parse: power_now = {power_now}"))?
+            .context(format!("power_now parse: power_now = \"{power_now}\""))?
             / 100_000;
         if power_now == self.prev_power {
             Ok(None)
