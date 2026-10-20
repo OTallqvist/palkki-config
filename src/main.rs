@@ -3,7 +3,6 @@ const BAR_HEIGHT: u32 = 19;
 use palkki::Bar;
 fn main() {
     let mut bar = Bar::with_height(BAR_HEIGHT);
-    //TODO:  bar.add_bg(Bg::new)
     bar.add_widgets(Box::new([
         widgets::Clock::new_dyn(),
         widgets::Ram::new_dyn(),
