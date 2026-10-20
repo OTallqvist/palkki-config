@@ -1,5 +1,7 @@
 pub mod clock;
 pub use clock::Clock;
+pub mod net;
+pub use net::Net;
 pub mod ram;
 pub use ram::Ram;
 pub mod cpu;
